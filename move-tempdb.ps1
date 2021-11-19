@@ -110,32 +110,61 @@ $drivepath="$($availableDiskletter):\MSSQL\DATA\"
 
 ##Assign permissions to SQL server service
 
-###Coming soon
+ 
+ ##CREATE AND EXECUTE ALTER STATEMENTS
+$SQLinstancesName = $SQLinstances.Split("$") 
+foreach($sqli in $SQLinstancesName){
+    if($sqli -match 'MSSQLSERVER')
+    {
 
-##Here-String to construct ALTER statement
-$ALTER=@"
-SELECT 'ALTER DATABASE tempdb MODIFY FILE (NAME = [' + f.name + '],'
-	+ ' FILENAME = ''$($availableDiskletter):\MSSQL\DATA\' + f.name
-	+ CASE WHEN f.type = 1 THEN '.ldf' ELSE '.mdf' END
-	+ ''');'
-FROM sys.master_files f
-WHERE f.database_id = DB_ID(N'tempdb');
-"@
-##PREPARE ALTER STATEMENT - WORK IN PROGRESS
+         $drivepath="$($availableDiskletter):\MSSQL\DATA\$($sqli)\"
+        if(-not(Test-Path -Path $drivepath -ErrorAction Stop)){
+            ##if is not true create a log file to save INFO & ERROR records
+            New-Item -ItemType Directory -Path $drivepath -ErrorAction Stop | Out-Null ## bypass output
+        }
 
-$commands=Invoke-Sqlcmd -Query $ALTER
+        $ALTER=@"
+        SELECT 'ALTER DATABASE tempdb MODIFY FILE (NAME = [' + f.name + '],'
+        + ' FILENAME = ''$($availableDiskletter):\MSSQL\DATA\$($sqli)\' + f.name
+        + CASE WHEN f.type = 1 THEN '.ldf' ELSE '.mdf' END
+        + ''');'
+        FROM sys.master_files f
+        WHERE f.database_id = DB_ID(N'tempdb');
+        "@
+       $commands=Invoke-Sqlcmd -ServerInstance "$env:COMPUTERNAME" -Query $ALTER | select -ExpandProperty Column1
+       foreach($cmd1 in $commands){
+            
+            Invoke-Sqlcmd -ServerInstance "$env:COMPUTERNAME" -Query $cmd1
+       }
+       
+    }
+    elseif($sqli -match "MSSQL"){
+       ## 
+    }
+    else{
 
-##ALTER TEMPDB LOCATION - WORK IN PROGRESS
+        $drivepath="$($availableDiskletter):\MSSQL\DATA\$($sqli)\"
+        if(-not(Test-Path -Path $drivepath -ErrorAction Stop)){
+            ##if is not true create a log file to save INFO & ERROR records
+            New-Item -ItemType Directory -Path $drivepath -ErrorAction Stop | Out-Null ## bypass output
+        }
 
-foreach($cmd in $commands){
+            $ALTER=@"
+            SELECT 'ALTER DATABASE tempdb MODIFY FILE (NAME = [' + f.name + '],'
+            + ' FILENAME = ''$($availableDiskletter):\MSSQL\DATA\$($sqli)\' + f.name
+            + CASE WHEN f.type = 1 THEN '.ldf' ELSE '.mdf' END
+            + ''');'
+            FROM sys.master_files f
+            WHERE f.database_id = DB_ID(N'tempdb');
+            "@
+        $commands=Invoke-Sqlcmd -ServerInstance "$env:COMPUTERNAME\$sqli" -Query $ALTER | select -ExpandProperty Column1
+        foreach($cmd2 in $commands){
 
-    Invoke-Sqlcmd -Query $cmd
-}
+            Invoke-Sqlcmd -ServerInstance "$env:COMPUTERNAME\$sqli" -Query $cmd2
+       }
+    }
 
-##EXECUTE ALTER DATABASE STATEMENTS
-
-###FOR EACH CHOSEN SQL INSTANCE
-
+} 
 ##RESTART SQL SERVER SERVICES
 
 Restart-SQLInstances
