@@ -50,7 +50,7 @@ Function Restart-SQLInstances {
         Add-Content -Path $LogFile -Value "[INFORMATION]-$(Get-Date -Format o)-SQL Instances restarted: $SQLintances"
     }
     catch{
-        Add-Content -Path $LogFile -Value "[ERROR]-$(Get-Date -Format o)-$SQLinstances failed to restars"
+        Add-Content -Path $LogFile -Value "[ERROR]-$(Get-Date -Format o)-$SQLinstances failed to restart"
         throw
     }
 }
