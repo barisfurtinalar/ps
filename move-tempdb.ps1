@@ -25,32 +25,37 @@ if(-not(Get-Module -Name sqlps -ListAvailable)){
 else{
     Add-Content -Path $LogFile -Value "[INFORMATION]-$(Get-Date -Format o)-SQL PS Module is installed"
 }
-
- ##Some re-usable logic
-
+ ##Some re-usable logic - get SQL services and add them in a hashtable
  Function Get-SQLInstances {
   Param(
       $Server = $env:ComputerName
       )
-    $Instances = @()
-    $Instances = gwmi win32_service -computerName $Server | ?{$_.Caption -match "SQL Server*" -and $_.PathName -match "sqlservr.exe"} | Select -ExpandProperty Name
-    Add-Content -Path $LogFile -Value "[INFORMATION]-$(Get-Date -Format o)-SQL Server - Instances found: $Instances"
-
-  return $Instances
+    $SQLservicesHash=@{}
+    try 
+    {
+        Get-WmiObject win32_service -computerName $Server | ?{$_.Caption -match "SQL Server*" -and $_.PathName -match "sqlservr.exe"} | Foreach-Object{$SQLservicesHash.Add($_.Name,$_.Status)}
+        Add-Content -Path $LogFile -Value "[INFORMATION]-$(Get-Date -Format o)-SQL Server - Instances found: $SQLservicesHash.Keys"
+    }
+    catch
+    {   
+        Add-Content -Path $LogFile -Value "[ERROR]-$(Get-Date -Format o)- No SQL Servicefound: $SQLservicesHash.Keys"
+        throw 
+    }
+    return $SQLservicesHash 
 } 
 
 Function Restart-SQLInstances {
    
     try{
-        $SQLinstances = Get-SQLInstances
-        Stop-Service $SQLinstances -Force
+        $SQLinstances = (Get-SQLInstances).Keys
+        $SQLinstances | Stop-Service -Force
         Write-Output 'Sleeping 10 secs ...'
         Start-Sleep 10
-        Start-Service $SQLinstances
+        $SQLinstances | Start-Service 
         Add-Content -Path $LogFile -Value "[INFORMATION]-$(Get-Date -Format o)-SQL Instances restarted: $SQLintances"
     }
     catch{
-        Add-Content -Path $LogFile -Value "[ERROR]-$(Get-Date -Format o)-$SQLinstances failed to restart"
+        Add-Content -Path $LogFile -Value "[ERROR]-$(Get-Date -Format o)-$SQLinstances failed to meddle with"
         throw
     }
 }
@@ -78,6 +83,7 @@ function Get-NextAvailableDriveLetter {
     return $available[0]
 }
 ##PREPARE DISKS FOR TEMPDB
+#$availableDiskletter='Z'
 $availableDiskletter=Get-NextAvailableDriveLetter
 
 $NVMe = Get-PhysicalDisk | ? { $_.CanPool -eq $True -and $_.FriendlyName -eq "NVMe Amazon EC2 NVMe"}
@@ -112,6 +118,7 @@ $drivepath="$($availableDiskletter):\MSSQL\DATA\"
 
  
  ##CREATE AND EXECUTE ALTER STATEMENTS
+$SQLinstances = Get-SQLInstances 
 $SQLinstancesName = $SQLinstances.Split("$") 
 foreach($sqli in $SQLinstancesName){
     if($sqli -match 'MSSQLSERVER')
@@ -141,6 +148,7 @@ foreach($sqli in $SQLinstancesName){
     elseif($sqli -match "MSSQL"){
        ## 
     }
+    ## For named instances
     else{
 
         $drivepath="$($availableDiskletter):\MSSQL\DATA\$($sqli)\"
