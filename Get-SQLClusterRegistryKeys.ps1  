@@ -1,0 +1,27 @@
+######################################################################
+##
+## Get-SQLClusterRegistryKeys.ps1
+## Search the registry for SQL Server cluster resource keys
+## 3 registry keys have to be present per SQL instance (SQL Server,
+## SQL Server CEIP, SQL Server Agent)
+##
+######################################################################
+[int]$seq=1
+cd HKLM:\Cluster\Resources
+Write-Output " "
+Write-Output "############################################"
+Write-Output "SQL Server cluster resource keys in Registry"
+Write-Output "############################################"
+Get-ChildItem . -Recurse -ErrorAction SilentlyContinue | 
+   ForEach-Object { 
+      if((get-itemproperty -Path $_.PsPath) -match "SQL Server*")
+      { 
+         $regpath=$_.Name
+         $name=Get-ItemPropertyValue -Path registry::$_ -Name "Name"
+         $type=Get-ItemPropertyValue -Path registry::$_ -Name "Type"
+         Write-Output "$seq * $name -- registry entry found as type: $type on following registry path --> $regpath"
+         $seq ++
+      } 
+   } 
+
+Write-Output "############################################" 
