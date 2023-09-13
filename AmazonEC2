@@ -1,0 +1,4 @@
+##EC2 Windows Troubleshooting
+
+## Verify PV driver version
+Get-ItemProperty HKLM:\SOFTWARE\Amazon\PVDriver
